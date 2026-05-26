@@ -422,6 +422,14 @@ export const AuditForm: React.FC<AuditFormProps> = ({
               ✓ Đã đến điểm chạm cuối cùng
             </span>
             <button
+              id="btn-show-guidelines"
+              type="button"
+              onClick={() => setShowSetupHelp(true)}
+              className="border border-brand-border bg-brand-dark hover:bg-brand-dark-lighter text-brand-gold px-4 py-2.5 rounded-xl font-bold font-sans text-xs transition shadow-sm cursor-pointer flex items-center justify-center gap-1.5"
+            >
+              <span>⚙️ Hướng dẫn thiết lập</span>
+            </button>
+            <button
               id="btn-submit-checklist"
               onClick={handleSubmitChecklist}
               disabled={isSending}
@@ -494,7 +502,7 @@ export const AuditForm: React.FC<AuditFormProps> = ({
     var parentFolder = DriveApp.getFolderById(parentFolderId);
     
     // Tạo thư mục con riêng đặt theo Tên trung tâm và ngày chấm
-    var folderName = data.centerName + " - " + data.date.toString().replace(/\//g, "-");
+    var folderName = data.centerName + " - " + data.date.toString().split("/").join("-");
     var subFolders = parentFolder.getFoldersByName(folderName);
     var targetFolder = subFolders.hasNext() ? subFolders.next() : parentFolder.createFolder(folderName);
     
