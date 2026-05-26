@@ -22,6 +22,7 @@ interface SessionSidebarProps {
   onCreateSession: (center: string, evaluator: string, date: string) => void;
   onDeleteSession: (id: string) => void;
   onImportSessions: (imported: AuditSession[]) => void;
+  onCloseMobile?: () => void;
 }
 
 
@@ -31,7 +32,8 @@ export const SessionSidebar: React.FC<SessionSidebarProps> = ({
   onSelectSession,
   onCreateSession,
   onDeleteSession,
-  onImportSessions
+  onImportSessions,
+  onCloseMobile
 }) => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDeleteConfirmId, setShowDeleteConfirmId] = useState<string | null>(null);
@@ -123,7 +125,7 @@ export const SessionSidebar: React.FC<SessionSidebarProps> = ({
   return (
     <div className="w-full lg:w-80 bg-brand-dark-light border-r border-brand-border flex flex-col h-full shrink-0 shadow-sm text-gray-200" id="session-sidebar-root">
       {/* Brand Header */}
-      <div className="p-5 border-b border-brand-border bg-[#0d0c0b] text-white animate-fade-in" id="sidebar-header">
+      <div className="p-5 border-b border-brand-border bg-[#0d0c0b] text-white animate-fade-in flex items-center justify-between" id="sidebar-header">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-brand-gold flex items-center justify-center font-display font-black text-black text-base tracking-wider shadow">
             TĐ
@@ -135,6 +137,17 @@ export const SessionSidebar: React.FC<SessionSidebarProps> = ({
             <p className="text-[10px] text-gray-500 font-mono tracking-widest">OPERATIONAL AUDIT</p>
           </div>
         </div>
+
+        {onCloseMobile && (
+          <button
+            onClick={onCloseMobile}
+            className="lg:hidden px-2 py-1 text-gray-400 hover:text-white bg-brand-dark hover:bg-brand-dark-black border border-brand-border rounded-lg cursor-pointer active:scale-95 transition text-[10px] font-sans font-bold flex items-center justify-center gap-1"
+            title="Đóng"
+            type="button"
+          >
+            ✕ Đóng
+          </button>
+        )}
       </div>
 
       {/* Action panel */}

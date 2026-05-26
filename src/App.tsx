@@ -21,6 +21,7 @@ export default function App() {
   const [selectedTab, setSelectedTab] = useState<number>(0); // 0 = Dashboard, 1-5 = Touchpoints, 6 = AI Report
   const [currentTime, setCurrentTime] = useState<string>('');
   const [hasAutoSynced, setHasAutoSynced] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   // Automatic startup background sync with Google Sheets (if URL configured)
   useEffect(() => {
@@ -258,34 +259,66 @@ export default function App() {
   return (
     <div className="flex flex-col lg:flex-row h-screen w-screen bg-brand-dark overflow-hidden font-sans text-gray-200" id="applet-master">
       {/* Session manager History Sidebar panel */}
-      <SessionSidebar
-        sessions={sessions}
-        activeSessionId={activeSessionId}
-        onSelectSession={(id) => {
-          setActiveSessionId(id);
-          setSelectedTab(0); // Reset focusing to Dashboard on swap
-        }}
-        onCreateSession={handleCreateSession}
-        onDeleteSession={handleDeleteSession}
-        onImportSessions={handleImportSessions}
-      />
+      <div className={`
+        fixed inset-y-0 left-0 z-40 w-80 max-w-[85vw] transform 
+        lg:relative lg:translate-x-0 lg:max-w-none transition-transform duration-350 ease-in-out h-full shrink-0
+        ${mobileSidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full lg:translate-x-0'}
+      `} id="session-sidebar-wrapper">
+        <SessionSidebar
+          sessions={sessions}
+          activeSessionId={activeSessionId}
+          onSelectSession={(id) => {
+            setActiveSessionId(id);
+            setSelectedTab(0); // Reset focusing to Dashboard on swap
+            setMobileSidebarOpen(false); // Auto close sidebar drawer on mobile!
+          }}
+          onCreateSession={handleCreateSession}
+          onDeleteSession={handleDeleteSession}
+          onImportSessions={handleImportSessions}
+          onCloseMobile={() => setMobileSidebarOpen(false)}
+        />
+      </div>
+
+      {/* Mobile Drawer Backdrop overlay with active smooth click to close */}
+      {mobileSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/70 backdrop-blur-xs z-30 lg:hidden cursor-pointer animate-fade-in"
+          onClick={() => setMobileSidebarOpen(false)}
+          id="sidebar-mobile-backdrop"
+        />
+      )}
 
       {/* Primary Evaluation Canvas Area */}
       {activeSession ? (
         <div className="flex-1 flex flex-col h-full overflow-hidden bg-brand-dark" id="workspace-canvas">
           {/* Top Luxurious Custom Header */}
-          <header className="bg-brand-dark-light border-b border-brand-border px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shrink-0 no-print" id="workspace-header">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-brand-gold animate-pulse" />
-                <span className="text-[10px] tracking-widest font-mono font-bold text-gray-400 uppercase">
-                  SITE AUDIT ACTIVE SESSION
-                </span>
+          <header className="bg-brand-dark-light border-b border-brand-border px-4 py-3 sm:px-6 sm:py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shrink-0 no-print" id="workspace-header">
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              {/* Mobile Sidebar Hamburger Toggle Button */}
+              <button
+                onClick={() => setMobileSidebarOpen(true)}
+                className="lg:hidden flex items-center justify-center p-2.5 -ml-1 text-gray-400 hover:text-white bg-brand-dark hover:bg-brand-dark-lighter border border-brand-border rounded-xl cursor-pointer active:scale-95 transition"
+                id="btn-mobile-sidebar-toggle"
+                title="Mở Lịch sử Đánh giá"
+                type="button"
+              >
+                <Building2 className="w-5 h-5 text-brand-gold" />
+              </button>
+
+              <div className="space-y-0.5 flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-brand-gold animate-pulse shrink-0" />
+                  <span className="text-[9px] sm:text-[10px] tracking-widest font-mono font-bold text-gray-400 uppercase truncate">
+                    SITE AUDIT ACTIVE SESSION
+                  </span>
+                </div>
+                <h1 className="font-serif italic font-normal text-brand-gold text-sm sm:text-base md:text-lg tracking-wide uppercase truncate">
+                  {activeSession.centerName}
+                  <span className="hidden xs:inline text-gray-400 text-[11px] sm:text-xs font-normal font-sans not-italic capitalize ml-1.5">
+                    ({activeSession.evaluatorName})
+                  </span>
+                </h1>
               </div>
-              <h1 className="font-serif italic font-normal text-brand-gold text-lg tracking-wide uppercase flex items-center gap-2">
-                {activeSession.centerName}
-                <span className="text-gray-400 text-xs font-normal font-sans not-italic capitalize">({activeSession.evaluatorName})</span>
-              </h1>
             </div>
 
             {/* Local Synchronized clock */}
