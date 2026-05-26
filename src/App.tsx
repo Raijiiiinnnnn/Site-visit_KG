@@ -1,0 +1,486 @@
+import { useState, useEffect } from 'react';
+import { AuditSession, INITIAL_TOUCHPOINTS, Touchpoint, Criterion, POPULAR_CENTERS, GOOGLE_SHEETS_SCRIPT_URL } from './types';
+import { SessionSidebar } from './components/SessionSidebar';
+import { Dashboard } from './components/Dashboard';
+import { AuditForm } from './components/AuditForm';
+import { 
+  Building2, 
+  Clock, 
+  CheckCircle2, 
+  AlertCircle, 
+  LayoutDashboard, 
+  FileCheck,
+  Award
+} from 'lucide-react';
+
+const LOCAL_STORAGE_KEY = 'trong_dong_audit_sessions';
+
+export default function App() {
+  const [sessions, setSessions] = useState<AuditSession[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [selectedTab, setSelectedTab] = useState<number>(0); // 0 = Dashboard, 1-5 = Touchpoints, 6 = AI Report
+  const [currentTime, setCurrentTime] = useState<string>('');
+  const [hasAutoSynced, setHasAutoSynced] = useState(false);
+
+  // Automatic startup background sync with Google Sheets (if URL configured)
+  useEffect(() => {
+    if (sessions.length === 0 || hasAutoSynced) return;
+    
+    const url = GOOGLE_SHEETS_SCRIPT_URL;
+    if (!url || !url.startsWith('http') || url.includes('your_script_id_here')) return;
+
+    // Run sync for each session loaded from localStorage
+    sessions.forEach(async (sess) => {
+      let totalCriteria = 0;
+      let evaluatedCount = 0;
+      let sumAllScores = 0;
+      let criticalCount = 0;
+
+      sess.touchpoints.forEach((tp) => {
+        tp.criteria.forEach((c) => {
+          totalCriteria++;
+          if (c.score > 0) {
+            evaluatedCount++;
+            sumAllScores += c.score;
+            if (c.score <= 3) {
+              criticalCount++;
+            }
+          }
+        });
+      });
+
+      const overallAverage = evaluatedCount > 0 ? parseFloat((sumAllScores / evaluatedCount).toFixed(1)) : 0;
+
+      const payload = {
+        id: sess.id,
+        centerName: sess.centerName,
+        evaluatorName: sess.evaluatorName,
+        date: sess.date,
+        status: sess.status,
+        averageScore: overallAverage,
+        errorCount: criticalCount,
+        summaryNote: sess.summaryNote || 'Chưa ghi chú',
+        aiReportSummary: 'Đã tắt tính năng phân tích AI'
+      };
+
+      try {
+        await fetch(url, {
+          method: 'POST',
+          mode: 'no-cors',
+          body: JSON.stringify(payload),
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        console.log(`[Auto-Sync] Tự động gửi đợt kiểm tra ${sess.centerName} (${sess.id}) thành công.`);
+      } catch (err) {
+        console.error("[Auto-Sync] Lỗi tự động đồng bộ khi mở ứng dụng:", err);
+      }
+    });
+
+    setHasAutoSynced(true);
+  }, [sessions, hasAutoSynced]);
+
+
+  // States for landing setup form
+  const [landingCenter, setLandingCenter] = useState<string>('');
+  const [landingCustomCenter, setLandingCustomCenter] = useState<string>('');
+  const [landingEvaluator, setLandingEvaluator] = useState<string>('');
+  const [landingDate, setLandingDate] = useState<string>(() => {
+    return new Date().toISOString().split('T')[0];
+  });
+
+  // 1. Local Vietnamese Clock sync
+  useEffect(() => {
+    const updateClock = () => {
+      const now = new Date();
+      setSelectedTimeFormat(now);
+    };
+    updateClock();
+    const timer = setInterval(updateClock, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const setSelectedTimeFormat = (d: Date) => {
+    const hours = String(d.getHours()).padStart(2, '0');
+    const mins = String(d.getMinutes()).padStart(2, '0');
+    const secs = String(d.getSeconds()).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    setCurrentTime(`${hours}:${mins}:${secs} - ${day}/${month}/${year}`);
+  };
+
+  // 2. Load historic evaluations from localStorage on startup
+  useEffect(() => {
+    const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached) as AuditSession[];
+        setSessions(parsed);
+        if (parsed.length > 0) {
+          setActiveSessionId(parsed[0].id);
+        }
+      } catch (err) {
+        console.error("Lỗi khôi phục localStorage:", err);
+      }
+    } else {
+      // Setup a default demo evaluation at launch to delight operations division
+      const defaultSessionId = `session-${Date.now()}`;
+      const defaultSession: AuditSession = {
+        id: defaultSessionId,
+        centerName: "Trống Đồng Palace Cảnh Hồ",
+        evaluatorName: "Site Visit Khối Điều Hành",
+        date: new Date().toLocaleDateString('vi-VN'),
+        status: 'In_Progress',
+        touchpoints: JSON.parse(JSON.stringify(INITIAL_TOUCHPOINTS)) as Touchpoint[], // deep clone template
+        summaryNote: "Khảo sát thực tế sảnh đón và bãi đỗ xe chuẩn bị đón tiệc cưới buổi chiều.",
+        aiReport: ""
+      };
+      setSessions([defaultSession]);
+      setActiveSessionId(defaultSessionId);
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify([defaultSession]));
+    }
+  }, []);
+
+  const activeSession = sessions.find(s => s.id === activeSessionId) || null;
+
+  // 3. Persist session list back to caching
+  const saveAllSessions = (updated: AuditSession[]) => {
+    setSessions(updated);
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
+  };
+
+  // Handler to modify checklist scores, remarks, photo links
+  const handleUpdateCriterion = (touchpointId: string, criterionId: string, updatedFields: Partial<Criterion>) => {
+    if (!activeSession) return;
+
+    const updatedTouchpoints = activeSession.touchpoints.map((tp) => {
+      if (tp.id !== touchpointId) return tp;
+      return {
+        ...tp,
+        criteria: tp.criteria.map((c) => {
+          if (c.id !== criterionId) return c;
+          return { ...c, ...updatedFields };
+        })
+      };
+    });
+
+    const isFinished = updatedTouchpoints.every(tp => tp.criteria.every(c => c.score > 0));
+
+    const updatedSession: AuditSession = {
+      ...activeSession,
+      touchpoints: updatedTouchpoints,
+      status: isFinished ? 'Completed' : 'In_Progress',
+      // If score is updated, reset historic AI report so they regenerate updated parameters
+      aiReport: updatedFields.score !== undefined ? "" : activeSession.aiReport
+    };
+
+    const newSessionsList = sessions.map(s => s.id === activeSession.id ? updatedSession : s);
+    saveAllSessions(newSessionsList);
+  };
+
+  // Handle core session annotations updates
+  const handleUpdateSummaryNote = (note: string) => {
+    if (!activeSession) return;
+    const updatedSession = { ...activeSession, summaryNote: note };
+    const newSessionsList = sessions.map(s => s.id === activeSession.id ? updatedSession : s);
+    saveAllSessions(newSessionsList);
+  };
+
+  const handleUpdateSessionReport = (report: string) => {
+    if (!activeSession) return;
+    const updatedSession = { ...activeSession, aiReport: report };
+    const newSessionsList = sessions.map(s => s.id === activeSession.id ? updatedSession : s);
+    saveAllSessions(newSessionsList);
+  };
+
+  // Create standard pristine wedding center checklist evaluation
+  const handleCreateSession = (center: string, evaluator: string, customDate?: string) => {
+    const newSessionId = `session-${Date.now()}`;
+
+    let formattedDate = new Date().toLocaleDateString('vi-VN');
+    if (customDate) {
+      if (customDate.includes('-')) {
+        const parts = customDate.split('-');
+        if (parts.length === 3) {
+          formattedDate = `${parts[2]}/${parts[1]}/${parts[0]}`; // YYYY-MM-DD -> DD/MM/YYYY
+        } else {
+          formattedDate = customDate;
+        }
+      } else {
+        formattedDate = customDate;
+      }
+    }
+    
+    const newSession: AuditSession = {
+      id: newSessionId,
+      centerName: center,
+      evaluatorName: evaluator,
+      date: formattedDate,
+      status: 'In_Progress',
+      touchpoints: JSON.parse(JSON.stringify(INITIAL_TOUCHPOINTS)) as Touchpoint[],
+      summaryNote: "",
+      aiReport: ""
+    };
+
+    const updated = [newSession, ...sessions];
+    setActiveSessionId(newSessionId);
+    setSelectedTab(0); // focus on Dashboard analytic overview
+    saveAllSessions(updated);
+  };
+
+  const handleDeleteSession = (id: string) => {
+    const updated = sessions.filter(s => s.id !== id);
+    saveAllSessions(updated);
+    if (activeSessionId === id) {
+      setActiveSessionId(updated.length > 0 ? updated[0].id : null);
+    }
+  };
+
+  const handleImportSessions = (imported: AuditSession[]) => {
+    saveAllSessions(imported);
+    if (imported.length > 0) {
+      setActiveSessionId(imported[0].id);
+      setSelectedTab(0);
+    }
+  };
+
+  // Tab navigational helpers
+  const handlePrevTab = () => {
+    setSelectedTab(prev => Math.max(1, prev - 1));
+  };
+
+  const handleNextTab = () => {
+    setSelectedTab(prev => Math.min(5, prev + 1));
+  };
+
+  return (
+    <div className="flex flex-col lg:flex-row h-screen w-screen bg-brand-dark overflow-hidden font-sans text-gray-200" id="applet-master">
+      {/* Session manager History Sidebar panel */}
+      <SessionSidebar
+        sessions={sessions}
+        activeSessionId={activeSessionId}
+        onSelectSession={(id) => {
+          setActiveSessionId(id);
+          setSelectedTab(0); // Reset focusing to Dashboard on swap
+        }}
+        onCreateSession={handleCreateSession}
+        onDeleteSession={handleDeleteSession}
+        onImportSessions={handleImportSessions}
+      />
+
+      {/* Primary Evaluation Canvas Area */}
+      {activeSession ? (
+        <div className="flex-1 flex flex-col h-full overflow-hidden bg-brand-dark" id="workspace-canvas">
+          {/* Top Luxurious Custom Header */}
+          <header className="bg-brand-dark-light border-b border-brand-border px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shrink-0 no-print" id="workspace-header">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-brand-gold animate-pulse" />
+                <span className="text-[10px] tracking-widest font-mono font-bold text-gray-400 uppercase">
+                  SITE AUDIT ACTIVE SESSION
+                </span>
+              </div>
+              <h1 className="font-serif italic font-normal text-brand-gold text-lg tracking-wide uppercase flex items-center gap-2">
+                {activeSession.centerName}
+                <span className="text-gray-400 text-xs font-normal font-sans not-italic capitalize">({activeSession.evaluatorName})</span>
+              </h1>
+            </div>
+
+            {/* Local Synchronized clock */}
+            <div className="flex items-center gap-2 text-gray-400 bg-[#161616] border border-brand-border rounded-full px-3.5 py-1 text-[10px] font-mono shadow-2xs self-stretch sm:self-auto justify-center">
+              <Clock className="w-3.5 h-3.5 text-brand-gold" />
+              <span>{currentTime || "00:00:00 - 26/05/2026"}</span>
+            </div>
+          </header>
+
+          {/* Touchpoint Tab Switcher Navigation bar */}
+          <nav className="bg-brand-dark-light border-b border-brand-border flex items-center overflow-x-auto px-6 py-2 shrink-0 no-print gap-1 select-none scrollbar-none" id="touchpoint-tab-switcher">
+            <button
+              id="tab-dashboard"
+              onClick={() => setSelectedTab(0)}
+              className={`flex items-center gap-1.5 py-2 px-3.5 rounded-xl text-xs font-sans font-semibold border transition shrink-0 cursor-pointer ${
+                selectedTab === 0
+                  ? 'bg-brand-gold border-brand-gold text-black shadow-xs'
+                  : 'bg-transparent border-transparent text-gray-400 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <LayoutDashboard className="w-4 h-4" />
+              Tổng Quan
+            </button>
+
+            {/* Checklist items dynamic tabs */}
+            {activeSession.touchpoints.map((tp, idx) => {
+              const tabIndex = idx + 1;
+              const isSelected = selectedTab === tabIndex;
+              const evaluatedNum = tp.criteria.filter(c => c.score > 0).length;
+              const totalsNum = tp.criteria.length;
+              const hasWarnings = tp.criteria.some(c => c.score > 0 && c.score <= 3);
+
+              return (
+                <button
+                  id={`tab-touchpoint-${tabIndex}`}
+                  key={tp.id}
+                  onClick={() => setSelectedTab(tabIndex)}
+                  className={`flex items-center gap-2 py-2 px-3.5 rounded-xl text-[11px] font-sans font-semibold border transition shrink-0 cursor-pointer ${
+                    isSelected
+                      ? 'bg-brand-gold/15 border-brand-gold/30 text-brand-gold'
+                      : 'bg-transparent border-transparent text-gray-400 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  <span className={`w-2 h-2 rounded-full ${
+                    evaluatedNum === totalsNum 
+                      ? 'bg-emerald-500' 
+                      : hasWarnings 
+                        ? 'bg-brand-gold animate-pulse'
+                        : 'bg-zinc-650'
+                  }`} />
+                  {tp.name.split('. ')[1]}
+                  <span className="text-[9px] font-mono font-medium text-gray-500">({evaluatedNum}/{totalsNum})</span>
+                </button>
+              );
+            })}
+
+          </nav>
+
+          {/* Dynamic Render Tabs Screen Container */}
+          <main className="flex-1 overflow-y-auto p-6 bg-brand-dark" id="workspace-core-feed">
+            {selectedTab === 0 && (
+              <Dashboard
+                session={activeSession}
+                onNavigateToTab={(num) => setSelectedTab(num)}
+              />
+            )}
+
+            {selectedTab >= 1 && selectedTab <= 5 && (
+              <AuditForm
+                session={activeSession}
+                selectedTab={selectedTab}
+                onUpdateCriterion={handleUpdateCriterion}
+                onPrevTab={handlePrevTab}
+                onNextTab={handleNextTab}
+                onUpdateSummaryNote={handleUpdateSummaryNote}
+              />
+            )}
+          </main>
+        </div>
+      ) : (
+        <div className="flex-1 flex flex-col items-center justify-center bg-brand-dark p-4 md:p-12 overflow-y-auto" id="workspace-error-fallback">
+          <div className="w-full max-w-md bg-brand-dark-light border border-brand-border p-6 md:p-8 rounded-2xl shadow-2xl text-left space-y-6 animate-fade-in" id="landing-setup-card">
+            
+            <div className="text-center space-y-2">
+              <div className="w-12 h-12 rounded-xl bg-brand-gold flex items-center justify-center font-display font-black text-black text-lg tracking-wider mx-auto shadow-md">
+                TĐ
+              </div>
+              <h2 className="font-serif italic font-normal text-brand-gold text-xl uppercase tracking-wider">
+                Khởi tạo đợt Đánh giá mới
+              </h2>
+              <p className="text-[11px] text-gray-400 font-sans">
+                Khối Điều Hành - Quy trình quản lý chất lượng thực địa SOP
+              </p>
+            </div>
+
+            {/* Inline Setup Form */}
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if (!landingCenter) {
+                alert('Vui lòng chọn hoặc nhập tên Trung tâm.');
+                return;
+              }
+              if (!landingEvaluator.trim()) {
+                alert('Vui lòng nhập tên người chấm.');
+                return;
+              }
+              const finalLaunchCenter = landingCenter === 'custom' ? landingCustomCenter.trim() : landingCenter;
+              handleCreateSession(
+                finalLaunchCenter,
+                landingEvaluator.trim(),
+                landingDate
+              );
+              // Clean up inputs on success
+              setLandingCenter('');
+              setLandingCustomCenter('');
+              setLandingEvaluator('');
+            }} className="space-y-4 text-xs font-sans">
+              
+              {/* Evaluator input */}
+              <div className="space-y-1.5">
+                <label className="block text-gray-400 font-bold uppercase tracking-wider text-[10px]">
+                  Tên người chấm (Chuyên viên):
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ví dụ: Nguyễn Văn A..."
+                  value={landingEvaluator}
+                  onChange={(e) => setLandingEvaluator(e.target.value)}
+                  className="w-full border border-brand-border bg-[#0a0a0a] p-3 rounded-xl focus:outline-none focus:ring-1 focus:ring-brand-gold text-gray-200 placeholder-gray-600 font-sans"
+                />
+              </div>
+
+              {/* Date Input */}
+              <div className="space-y-1.5">
+                <label className="block text-gray-400 font-bold uppercase tracking-wider text-[10px]">
+                  Ngày chấm:
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={landingDate}
+                  onChange={(e) => setLandingDate(e.target.value)}
+                  className="w-full border border-brand-border bg-[#0a0a0a] p-3 rounded-xl focus:outline-none focus:ring-1 focus:ring-brand-gold text-gray-200 placeholder-gray-600 cursor-pointer font-sans"
+                />
+              </div>
+
+              {/* Center Dropdown */}
+              <div className="space-y-1.5">
+                <label className="block text-gray-400 font-bold uppercase tracking-wider text-[10px]">
+                  Chọn Trung tâm trong Hệ Thống:
+                </label>
+                <select
+                  required
+                  value={landingCenter}
+                  onChange={(e) => setLandingCenter(e.target.value)}
+                  className="w-full border border-brand-border bg-[#0a0a0a] p-3 rounded-xl focus:outline-none focus:ring-1 focus:ring-brand-gold text-gray-200 cursor-pointer font-sans"
+                >
+                  <option value="" disabled>-- Chọn trung tâm chấm --</option>
+                  {POPULAR_CENTERS.map((center) => (
+                    <option key={center} value={`Trống Đồng Palace ${center}`}>
+                      Trống Đồng Palace {center}
+                    </option>
+                  ))}
+                  <option value="custom" className="text-brand-gold font-bold">-- Nhập tên cơ sở khác --</option>
+                </select>
+              </div>
+
+              {landingCenter === 'custom' && (
+                <div className="space-y-1.5 animate-scale-in">
+                  <label className="block text-gray-400 font-semibold tracking-wider text-[9px]">
+                    Tên cơ sở tùy chỉnh:
+                  </label>
+                  <input
+                    type="text"
+                    required={landingCenter === 'custom'}
+                    placeholder="Nhập tên trung tâm khác..."
+                    value={landingCustomCenter}
+                    onChange={(e) => setLandingCustomCenter(e.target.value)}
+                    className="w-full border border-brand-gold bg-[#0a0a0a] p-3 rounded-xl focus:outline-none focus:ring-1 focus:ring-brand-gold text-gray-200 placeholder-gray-650 animate-fade-in font-sans"
+                  />
+                </div>
+              )}
+
+              {/* Submit */}
+              <button
+                type="submit"
+                className="w-full bg-brand-gold hover:bg-brand-gold-dark text-black py-3 rounded-xl font-bold uppercase tracking-wider text-xs transition duration-150 shadow-md cursor-pointer block mt-2 text-center"
+              >
+                ✓ Bắt đầu đánh giá thực địa
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

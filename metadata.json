@@ -1,0 +1,6 @@
+{
+  "name": "Đánh giá Vận hành Trống Đồng",
+  "description": "Hệ thống hỗ trợ đánh giá thực trạng tiêu chuẩn Không gian dịch vụ theo hành trình khách hàng & lập báo cáo đề xuất cải thiện chuyên nghiệp.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
