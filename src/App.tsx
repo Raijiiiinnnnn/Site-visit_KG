@@ -10,7 +10,9 @@ import {
   AlertCircle, 
   LayoutDashboard, 
   FileCheck,
-  Award
+  Award,
+  Settings,
+  X
 } from 'lucide-react';
 
 const LOCAL_STORAGE_KEY = 'trong_dong_audit_sessions';
@@ -22,6 +24,12 @@ export default function App() {
   const [currentTime, setCurrentTime] = useState<string>('');
   const [hasAutoSynced, setHasAutoSynced] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  
+  // Settings guidelines states
+  const [showSetupHelp, setShowSetupHelp] = useState(false);
+  const [isSettingsAuthenticated, setIsSettingsAuthenticated] = useState(false);
+  const [passcodeInput, setPasscodeInput] = useState('');
+  const [passcodeError, setPasscodeError] = useState('');
 
   // Automatic startup background sync with Google Sheets (if URL configured)
   useEffect(() => {
@@ -321,10 +329,21 @@ export default function App() {
               </div>
             </div>
 
-            {/* Local Synchronized clock */}
-            <div className="flex items-center gap-2 text-gray-400 bg-[#161616] border border-brand-border rounded-full px-3.5 py-1 text-[10px] font-mono shadow-2xs self-stretch sm:self-auto justify-center">
-              <Clock className="w-3.5 h-3.5 text-brand-gold" />
-              <span>{currentTime || "00:00:00 - 26/05/2026"}</span>
+            {/* Local Synchronized clock & Settings Icon button */}
+            <div className="flex items-center gap-2 self-stretch sm:self-auto justify-center">
+              <div className="flex items-center gap-2 text-gray-400 bg-[#161616] border border-brand-border rounded-full px-3.5 py-1 text-[10px] font-mono shadow-2xs">
+                <Clock className="w-3.5 h-3.5 text-brand-gold" />
+                <span>{currentTime || "00:00:00 - 26/05/2026"}</span>
+              </div>
+              <button
+                onClick={() => setShowSetupHelp(true)}
+                className="w-7 h-7 flex items-center justify-center bg-[#161616] hover:bg-brand-dark-lighter text-brand-gold border border-brand-border hover:border-brand-gold/50 rounded-full cursor-pointer active:scale-95 transition"
+                title="Thiết lập hệ thống"
+                type="button"
+                id="btn-settings-header"
+              >
+                <Settings className="w-3.5 h-3.5 transition-transform duration-300 hover:rotate-45" />
+              </button>
             </div>
           </header>
 
@@ -394,12 +413,22 @@ export default function App() {
                 onPrevTab={handlePrevTab}
                 onNextTab={handleNextTab}
                 onUpdateSummaryNote={handleUpdateSummaryNote}
+                onShowSetupHelp={() => setShowSetupHelp(true)}
               />
             )}
           </main>
         </div>
       ) : (
-        <div className="flex-1 flex flex-col items-center justify-center bg-brand-dark p-4 md:p-12 overflow-y-auto" id="workspace-error-fallback">
+        <div className="flex-1 flex flex-col items-center justify-center bg-brand-dark p-4 md:p-12 overflow-y-auto relative" id="workspace-error-fallback">
+          <button
+            onClick={() => setShowSetupHelp(true)}
+            className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center bg-brand-dark-light hover:bg-[#1a1a19] text-brand-gold border border-brand-border hover:border-brand-gold/50 rounded-xl cursor-pointer active:scale-95 transition shadow-md"
+            title="Thiết lập hệ thống"
+            type="button"
+            id="btn-settings-landing"
+          >
+            <Settings className="w-4 h-4 transition-transform duration-300 hover:rotate-45 text-brand-gold" />
+          </button>
           <div className="w-full max-w-md bg-brand-dark-light border border-brand-border p-6 md:p-8 rounded-2xl shadow-2xl text-left space-y-6 animate-fade-in" id="landing-setup-card">
             
             <div className="text-center space-y-2">
@@ -511,6 +540,186 @@ export default function App() {
                 ✓ Bắt đầu đánh giá thực địa
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Settings Instructions / Authentication Modal */}
+      {showSetupHelp && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in" id="modal-global-settings">
+          <div className="bg-[#141414] border border-brand-border rounded-2xl w-full max-w-2xl p-6 shadow-2xl duration-200 text-gray-200 max-h-[90vh] overflow-y-auto flex flex-col">
+            <div className="flex items-center justify-between border-b border-brand-border pb-3 mb-4 shrink-0">
+              <h3 className="font-serif italic text-brand-gold text-base flex items-center gap-2">
+                ⚙️ {isSettingsAuthenticated ? 'Hướng dẫn tích hợp Google Sheets & Drive' : 'Xác thực truy cập thiết lập'}
+              </h3>
+              <button 
+                onClick={() => {
+                  setShowSetupHelp(false);
+                  setIsSettingsAuthenticated(false);
+                  setPasscodeInput('');
+                  setPasscodeError('');
+                }} 
+                className="text-gray-500 hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {!isSettingsAuthenticated ? (
+              // Passcode Input UI
+              <form 
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (passcodeInput === '123123') {
+                    setIsSettingsAuthenticated(true);
+                    setPasscodeError('');
+                  } else {
+                    setPasscodeError('Mật khẩu không chính xác. Vui lòng thử lại!');
+                  }
+                }}
+                className="py-8 px-4 flex flex-col items-center justify-center space-y-4 max-w-sm mx-auto text-center font-sans text-xs"
+              >
+                <div className="w-12 h-12 rounded-full bg-brand-gold/10 flex items-center justify-center border border-brand-gold/30">
+                  <span className="text-xl">🔒</span>
+                </div>
+                <div className="space-y-1">
+                  <h4 className="font-sans font-bold text-gray-200 text-sm">Yêu cầu mật khẩu truy cập</h4>
+                  <p className="text-[11px] text-gray-400">Vui lòng nhập mật mã thiết lập để tiếp tục cài đặt cấu hình.</p>
+                </div>
+
+                <div className="w-full space-y-2">
+                  <input
+                    type="password"
+                    placeholder="Mật khẩu (mặc định: 123123)"
+                    value={passcodeInput}
+                    onChange={(e) => {
+                      setPasscodeInput(e.target.value);
+                      if (passcodeError) setPasscodeError('');
+                    }}
+                    className={`w-full text-center border p-3 rounded-xl focus:outline-none focus:ring-1 text-sm bg-[#0a0a0a] ${
+                      passcodeError 
+                        ? 'border-red-500/50 focus:ring-red-500' 
+                        : 'border-brand-border focus:border-brand-gold focus:ring-brand-gold'
+                    }`}
+                    autoFocus
+                  />
+                  {passcodeError && (
+                    <p className="text-[11px] text-red-400 font-sans">{passcodeError}</p>
+                  )}
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full bg-brand-gold hover:bg-brand-gold-dark text-black py-2.5 rounded-xl font-bold uppercase tracking-wider text-xs transition duration-150 shadow-md cursor-pointer"
+                >
+                  Xác nhận
+                </button>
+              </form>
+            ) : (
+              // Setup details
+              <div className="space-y-4 font-sans text-xs text-gray-300 leading-relaxed overflow-y-auto">
+                <p>
+                  Để kích hoạt nút <strong className="text-brand-gold">Gửi checklist</strong> và tự động lưu trữ hình ảnh thực địa vào thư mục Google Drive riêng biệt được phân loại theo từng chi nhánh và ngày chấm, bạn hãy thực hiện theo hướng dẫn sau:
+                </p>
+
+                <div className="bg-[#0c0a0a] border border-brand-border/40 p-4 rounded-xl space-y-2">
+                  <p className="font-bold text-gray-200">BƯỚC 1: Truy cập file mã nguồn hệ thống:</p>
+                  <p className="text-gray-400">
+                    Mở tệp tin <code className="bg-brand-dark text-brand-gold px-1.5 py-0.5 rounded font-mono">/src/types.ts</code> trong thư mục dự án này. Thay thế giá trị của hằng số <code className="text-emerald-400">GOOGLE_SHEETS_SCRIPT_URL</code> bằng đường dẫn ứng dụng Web Apps Script thực tế của bạn.
+                  </p>
+                </div>
+
+                <div className="bg-[#0c0a0a] border border-brand-border/40 p-4 rounded-xl space-y-3">
+                  <p className="font-bold text-gray-200">BƯỚC 2: Triển khai Google Apps Script:</p>
+                  <p className="text-gray-400">
+                    Tạo một Google Sheet mới, mở mục <strong>Tiện ích mở rộng &gt; Apps Script</strong>, dán đoạn mã lập trình tự động sau vào để xử lý lưu hàng đợi ảnh vào Google Drive:
+                  </p>
+                  
+                  <pre className="bg-brand-dark p-3 rounded-lg overflow-x-auto text-[10px] font-mono text-gray-400 max-h-48 border border-white/5 whitespace-pre select-all">
+{`function doPost(e) {
+  try {
+    var rawData = e.postData.contents;
+    var data = JSON.parse(rawData);
+    
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    if (sheet.getLastRow() === 0) {
+      sheet.appendRow([
+        "Mã Đợt", "Tên Trung Tâm", "Người Chấm", "Ngày Chấm", 
+        "Trạng Thái", "Điểm TB", "Số Lỗi", "Ghi Chú", "Link Google Drive", "Thời Gian"
+      ]);
+    }
+    
+    // ID thư mục mẹ được chỉ định từ yêu cầu của bạn:
+    var parentFolderId = "1PoATupKlpVJJOTBcMERfZVyfLhaOYAfs";
+    var parentFolder = DriveApp.getFolderById(parentFolderId);
+    
+    // Tạo thư mục con riêng đặt theo Tên trung tâm và ngày chấm
+    var folderName = data.centerName + " - " + data.date.toString().split("/").join("-");
+    var subFolders = parentFolder.getFoldersByName(folderName);
+    var targetFolder = subFolders.hasNext() ? subFolders.next() : parentFolder.createFolder(folderName);
+    
+    // Giải mã và lưu toàn bộ file ảnh đính kèm từ checklist
+    var photoCount = 0;
+    if (data.touchpoints) {
+      data.touchpoints.forEach(function(tp) {
+        tp.criteria.forEach(function(c) {
+          if (c.images && c.images.length > 0) {
+            c.images.forEach(function(base64Data, idx) {
+              try {
+                // Tách phần đầu data:image/png;base64, nếu có
+                var base64Parts = base64Data.split(",");
+                if (base64Parts.length > 1) {
+                  var meta = base64Parts[0];
+                  var base64Clean = base64Parts[1];
+                  
+                  var contentTypeMatch = meta.match(/data:([^;]+);base64/);
+                  var contentType = contentTypeMatch ? contentTypeMatch[1] : "image/jpeg";
+                  var extension = contentType.split("/")[1] || "jpg";
+                  
+                  var base64Decoded = Utilities.base64Decode(base64Clean);
+                  var blob = Utilities.newBlob(base64Decoded, contentType, tp.name.split(".")[0] + "_" + c.category + "_0" + (idx + 1) + "." + extension);
+                  targetFolder.createFile(blob);
+                  photoCount++;
+                }
+              } catch(imgErr) {}
+            });
+          }
+        });
+      });
+    }
+    
+    sheet.appendRow([
+      data.id, data.centerName, data.evaluatorName, data.date, 
+      "Đã hoàn thành", data.averageScore + "★", data.errorCount, 
+      data.summaryNote, targetFolder.getUrl(), new Date().toLocaleString("vi-VN")
+    ]);
+    
+    return ContentService.createTextOutput(JSON.stringify({ status: "success", folderUrl: targetFolder.getUrl() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch(err) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}`}
+                  </pre>
+                </div>
+
+                <div className="flex justify-end pt-2 border-t border-brand-border shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowSetupHelp(false);
+                      setIsSettingsAuthenticated(false);
+                      setPasscodeInput('');
+                      setPasscodeError('');
+                    }}
+                    className="bg-brand-gold hover:bg-brand-gold-dark text-black px-4 py-2 rounded-xl font-bold transition cursor-pointer"
+                  >
+                    Tôi đã hiểu
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -23,6 +23,7 @@ interface AuditFormProps {
   onPrevTab: () => void;
   onNextTab: () => void;
   onUpdateSummaryNote: (note: string) => void;
+  onShowSetupHelp?: () => void;
 }
 
 export const AuditForm: React.FC<AuditFormProps> = ({
@@ -31,14 +32,14 @@ export const AuditForm: React.FC<AuditFormProps> = ({
   onUpdateCriterion,
   onPrevTab,
   onNextTab,
-  onUpdateSummaryNote
+  onUpdateSummaryNote,
+  onShowSetupHelp
 }) => {
   const currentTouchpoint = session.touchpoints[selectedTab - 1];
   const fileInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
   const [lightboxImg, setLightboxImg] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [sendResult, setSendResult] = useState<{ status: 'success' | 'error' | null; message: string; folderUrl?: string }>({ status: null, message: '' });
-  const [showSetupHelp, setShowSetupHelp] = useState(false);
 
   // Submit complete checklist data to Google Sheets & Drive Folders
   const handleSubmitChecklist = async () => {
@@ -81,7 +82,9 @@ export const AuditForm: React.FC<AuditFormProps> = ({
     const url = GOOGLE_SHEETS_SCRIPT_URL;
     if (!url || !url.startsWith('http') || url.includes('your_script_id_here')) {
       setIsSending(false);
-      setShowSetupHelp(true);
+      if (onShowSetupHelp) {
+        onShowSetupHelp();
+      }
       return;
     }
 
@@ -422,14 +425,6 @@ export const AuditForm: React.FC<AuditFormProps> = ({
               ✓ Đã đến điểm chạm cuối cùng
             </span>
             <button
-              id="btn-show-guidelines"
-              type="button"
-              onClick={() => setShowSetupHelp(true)}
-              className="border border-brand-border bg-brand-dark hover:bg-brand-dark-lighter text-brand-gold px-4 py-2.5 rounded-xl font-bold font-sans text-xs transition shadow-sm cursor-pointer flex items-center justify-center gap-1.5"
-            >
-              <span>⚙️ Hướng dẫn thiết lập</span>
-            </button>
-            <button
               id="btn-submit-checklist"
               onClick={handleSubmitChecklist}
               disabled={isSending}
@@ -449,120 +444,6 @@ export const AuditForm: React.FC<AuditFormProps> = ({
           <p className="text-gray-500 text-[10px] font-mono mt-1.5 max-w-sm text-center">
             Hệ thống đang tải lên dữ liệu, chuyển tiếp hình ảnh đính kèm vào phân thư mục Google Drive...
           </p>
-        </div>
-      )}
-
-      {/* Setup instructions modal */}
-      {showSetupHelp && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4" id="modal-setup-help">
-          <div className="bg-[#141414] border border-brand-border rounded-2xl w-full max-w-2xl p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200 text-gray-200 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-brand-border pb-3 mb-4">
-              <h3 className="font-serif italic text-brand-gold text-base flex items-center gap-2">
-                ⚙️ Hướng dẫn tích hợp Google Sheets & Drive
-              </h3>
-              <button onClick={() => setShowSetupHelp(false)} className="text-gray-500 hover:text-white">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-4 font-sans text-xs text-gray-300 leading-relaxed">
-              <p>
-                Để kích hoạt nút <strong className="text-brand-gold">Gửi checklist</strong> và tự động lưu trữ hình ảnh thực địa vào thư mục Google Drive riêng biệt được phân loại theo từng chi nhánh và ngày chấm, bạn hãy thực hiện theo hướng dẫn sau:
-              </p>
-
-              <div className="bg-[#0c0a0a] border border-brand-border/40 p-4 rounded-xl space-y-2">
-                <p className="font-bold text-gray-200">BƯỚC 1: Truy cập file mã nguồn hệ thống:</p>
-                <p className="text-gray-400">
-                  Mở tệp tin <code className="bg-brand-dark text-brand-gold px-1.5 py-0.5 rounded font-mono">/src/types.ts</code> trong thư mục dự án này. Thay thế giá trị của hằng số <code className="text-emerald-400">GOOGLE_SHEETS_SCRIPT_URL</code> bằng đường dẫn ứng dụng Web Apps Script thực tế của bạn.
-                </p>
-              </div>
-
-              <div className="bg-[#0c0a0a] border border-brand-border/40 p-4 rounded-xl space-y-3">
-                <p className="font-bold text-gray-200">BƯỚC 2: Triển khai Google Apps Script:</p>
-                <p className="text-gray-400">
-                  Tạo một Google Sheet mới, mở mục <strong>Tiện ích mở rộng &gt; Apps Script</strong>, dán đoạn mã lập trình tự động sau vào để xử lý lưu hàng đợi ảnh vào Google Drive:
-                </p>
-                
-                <pre className="bg-brand-dark p-3 rounded-lg overflow-x-auto text-[10px] font-mono text-gray-400 max-h-48 border border-white/5 whitespace-pre select-all">
-{`function doPost(e) {
-  try {
-    var rawData = e.postData.contents;
-    var data = JSON.parse(rawData);
-    
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-    if (sheet.getLastRow() === 0) {
-      sheet.appendRow([
-        "Mã Đợt", "Tên Trung Tâm", "Người Chấm", "Ngày Chấm", 
-        "Trạng Thái", "Điểm TB", "Số Lỗi", "Ghi Chú", "Link Google Drive", "Thời Gian"
-      ]);
-    }
-    
-    // ID thư mục mẹ được chỉ định từ yêu cầu của bạn:
-    var parentFolderId = "1PoATupKlpVJJOTBcMERfZVyfLhaOYAfs";
-    var parentFolder = DriveApp.getFolderById(parentFolderId);
-    
-    // Tạo thư mục con riêng đặt theo Tên trung tâm và ngày chấm
-    var folderName = data.centerName + " - " + data.date.toString().split("/").join("-");
-    var subFolders = parentFolder.getFoldersByName(folderName);
-    var targetFolder = subFolders.hasNext() ? subFolders.next() : parentFolder.createFolder(folderName);
-    
-    // Giải mã và lưu toàn bộ file ảnh đính kèm từ checklist
-    var photoCount = 0;
-    if (data.touchpoints) {
-      data.touchpoints.forEach(function(tp) {
-        tp.criteria.forEach(function(c) {
-          if (c.images && c.images.length > 0) {
-            c.images.forEach(function(base64Data, idx) {
-              try {
-                // Tách phần đầu data:image/png;base64, nếu có
-                var base64Parts = base64Data.split(",");
-                if (base64Parts.length > 1) {
-                  var meta = base64Parts[0];
-                  var base64Clean = base64Parts[1];
-                  
-                  var contentTypeMatch = meta.match(/data:([^;]+);base64/);
-                  var contentType = contentTypeMatch ? contentTypeMatch[1] : "image/jpeg";
-                  var extension = contentType.split("/")[1] || "jpg";
-                  
-                  var base64Decoded = Utilities.base64Decode(base64Clean);
-                  var blob = Utilities.newBlob(base64Decoded, contentType, tp.name.split(".")[0] + "_" + c.category + "_0" + (idx + 1) + "." + extension);
-                  targetFolder.createFile(blob);
-                  photoCount++;
-                }
-              } catch(imgErr) {}
-            });
-          }
-        });
-      });
-    }
-    
-    sheet.appendRow([
-      data.id, data.centerName, data.evaluatorName, data.date, 
-      "Đã hoàn thành", data.averageScore + "★", data.errorCount, 
-      data.summaryNote, targetFolder.getUrl(), new Date().toLocaleString("vi-VN")
-    ]);
-    
-    return ContentService.createTextOutput(JSON.stringify({ status: "success", folderUrl: targetFolder.getUrl() }))
-      .setMimeType(ContentService.MimeType.JSON);
-  } catch(err) {
-    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: err.toString() }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-}`}
-                </pre>
-              </div>
-
-              <div className="flex justify-end pt-2 border-t border-brand-border">
-                <button
-                  type="button"
-                  onClick={() => setShowSetupHelp(false)}
-                  className="bg-brand-gold hover:bg-brand-gold-dark text-black px-4 py-2 rounded-xl font-bold transition cursor-pointer"
-                >
-                  Tôi đã hiểu
-                </button>
-              </div>
-            </div>
-          </div>
         </div>
       )}
 
