@@ -590,7 +590,7 @@ export default function App() {
                 <div className="w-full space-y-2">
                   <input
                     type="password"
-                    placeholder="Mật khẩu (mặc định: 123123)"
+                    placeholder="Mật khẩu (1*****)"
                     value={passcodeInput}
                     onChange={(e) => {
                       setPasscodeInput(e.target.value);
