@@ -91,7 +91,7 @@ export const AuditForm: React.FC<AuditFormProps> = ({
         mode: 'no-cors',
         body: JSON.stringify(payload),
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'text/plain;charset=utf-8'
         }
       });
 
@@ -494,7 +494,7 @@ export const AuditForm: React.FC<AuditFormProps> = ({
     var parentFolder = DriveApp.getFolderById(parentFolderId);
     
     // Tạo thư mục con riêng đặt theo Tên trung tâm và ngày chấm
-    var folderName = data.centerName + " - " + data.date.replace(/\\//g, "-");
+    var folderName = data.centerName + " - " + data.date.toString().replace(/\//g, "-");
     var subFolders = parentFolder.getFoldersByName(folderName);
     var targetFolder = subFolders.hasNext() ? subFolders.next() : parentFolder.createFolder(folderName);
     
@@ -506,12 +506,18 @@ export const AuditForm: React.FC<AuditFormProps> = ({
           if (c.images && c.images.length > 0) {
             c.images.forEach(function(base64Data, idx) {
               try {
-                var matches = base64Data.match(/^data:(image\\/[a-z]+);base64,(.+)$/);
-                if (matches && matches.length === 3) {
-                  var contentType = matches[1];
-                  var extension = contentType.split("/")[1];
-                  var base64Decoded = Utilities.base64Decode(matches[2]);
-                  var blob = Utilities.newBlob(base64Decoded, contentType, c.category + "_0" + (idx + 1) + "." + extension);
+                // Tách phần đầu data:image/png;base64, nếu có
+                var base64Parts = base64Data.split(",");
+                if (base64Parts.length > 1) {
+                  var meta = base64Parts[0];
+                  var base64Clean = base64Parts[1];
+                  
+                  var contentTypeMatch = meta.match(/data:([^;]+);base64/);
+                  var contentType = contentTypeMatch ? contentTypeMatch[1] : "image/jpeg";
+                  var extension = contentType.split("/")[1] || "jpg";
+                  
+                  var base64Decoded = Utilities.base64Decode(base64Clean);
+                  var blob = Utilities.newBlob(base64Decoded, contentType, tp.name.split(".")[0] + "_" + c.category + "_0" + (idx + 1) + "." + extension);
                   targetFolder.createFile(blob);
                   photoCount++;
                 }

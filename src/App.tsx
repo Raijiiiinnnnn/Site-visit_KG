@@ -70,7 +70,7 @@ export default function App() {
           mode: 'no-cors',
           body: JSON.stringify(payload),
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'text/plain;charset=utf-8'
           }
         });
         console.log(`[Auto-Sync] Tự động gửi đợt kiểm tra ${sess.centerName} (${sess.id}) thành công.`);
