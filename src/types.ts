@@ -251,6 +251,6 @@ export const POPULAR_CENTERS = [
 
 // Cấu hình URL Web App Google Apps Script để đồng bộ Google Sheets
 // Thay thế URL Ứng dụng Web đã triển khai của bạn tại đây
-export const GOOGLE_SHEETS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyr-aopcTTvdX8BV-gdwvVUSJ8eR3hRISp5L_0yIHTC3FEFXm7H3yKjGBL4dXZlj31o/exec";
+export const GOOGLE_SHEETS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyMk4It5EKcCYV45zPeB_o37Ax19o_uAIPGCXNyL9tumQnuB-pMiKjejglGCkqbgmjg/exec";
 
 
